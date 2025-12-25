@@ -23,8 +23,8 @@ class ProcessingJobAdmin(admin.ModelAdmin):
 
 @admin.register(Segment)
 class SegmentAdmin(admin.ModelAdmin):
-    list_display = ("job", "start_time", "end_time", "score", "selected")
-    list_filter = ("selected",)
+    list_display = ("job", "start_time", "end_time", "label", "score", "selected")
+    list_filter = ("selected", "label")
 
 
 @admin.register(EventLog)

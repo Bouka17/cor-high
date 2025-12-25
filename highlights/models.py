@@ -86,6 +86,7 @@ class Segment(models.Model):
     start_time = models.FloatField()
     end_time = models.FloatField()
     score = models.FloatField(default=0.0)
+    label = models.CharField(max_length=100, blank=True, default="Action")
     selected = models.BooleanField(default=False)
     thumbnail = models.ImageField(
         upload_to="thumbnails/%Y/%m/%d/", null=True, blank=True

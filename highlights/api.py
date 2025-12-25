@@ -3,7 +3,7 @@ from pathlib import Path
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-
+import os
 from .models import EventLog, ProcessingJob, Project, Segment, VideoAsset
 from .serializers import (
     EventLogSerializer,
@@ -56,10 +56,46 @@ class ProjectViewSet(viewsets.ModelViewSet):
         serializer = ProcessingJobSerializer(job)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+    @action(detail=False, methods=["post"])
+    def select_folder(self, request):
+        """Ouvre un dialogue de sélection de dossier natif sur le serveur (Windows)."""
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+            
+            # Check if we have a display
+            if os.environ.get('DISPLAY') == '' and os.name != 'nt':
+                 return Response({"error": "No display available"}, status=status.HTTP_400_BAD_REQUEST)
+
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes('-topmost', True)
+            folder_path = filedialog.askdirectory()
+            root.destroy()
+            
+            if folder_path:
+                # Normalisation pour Windows
+                folder_path = os.path.abspath(folder_path)
+                return Response({"path": folder_path})
+            return Response({"path": ""})
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class ProcessingJobViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ProcessingJob.objects.select_related("project").order_by("-created_at")
     serializer_class = ProcessingJobSerializer
+
+    @action(detail=True, methods=["post"])
+    def cancel(self, request, pk=None):
+        from cortexm_highlights.celery import app
+        job = self.get_object()
+        if job.celery_task_id:
+            app.control.revoke(job.celery_task_id, terminate=True)
+        job.status = ProcessingJob.Status.FAILED
+        job.error_message = "Cancelled by user"
+        job.save()
+        return Response({"status": "cancelled"})
 
 
 class SegmentViewSet(viewsets.ReadOnlyModelViewSet):

@@ -56,6 +56,7 @@ class SegmentSerializer(serializers.ModelSerializer):
             "start_time",
             "end_time",
             "score",
+            "label",
             "selected",
             "thumbnail_url",
             "preview_gif_url",

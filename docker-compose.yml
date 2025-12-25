@@ -22,6 +22,9 @@ services:
       - .:/app
     env_file:
       - .env
+    environment:
+      - DATABASE_URL=postgres://cortexm:cortexm@db:5432/cortexm
+      - REDIS_URL=redis://redis:6379/0
     ports:
       - "8000:8000"
     depends_on:
@@ -35,6 +38,9 @@ services:
       - .:/app
     env_file:
       - .env
+    environment:
+      - DATABASE_URL=postgres://cortexm:cortexm@db:5432/cortexm
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
       - db
       - redis

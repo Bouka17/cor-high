@@ -1,0 +1,23 @@
+# Eviter d'envoyer les dossiers lourds (le venv fait 2 Go !)
+venv/
+.git/
+media/
+__pycache__/
+
+# Fichiers de données locales
+db.sqlite3
+.env
+logs.txt
+
+# Vidéos (très lourdes)
+*.mp4
+*.mov
+*.avi
+*.mkv
+output_highlight.mp4
+
+# Fichiers temporaires ou IDE
+.vscode/
+.idea/
+*.pyc
+node_modules/

@@ -142,19 +142,28 @@ class JobStatusPartialView(View):
         return render(request, self.template_name, {"job": job})
 @csrf_exempt
 def browse_folder(request):
-    import tkinter as tk
-    from tkinter import filedialog
     import os
+    
+    # Check if we have a display
+    if os.environ.get('DISPLAY') == '' and os.name != 'nt':
+        return JsonResponse({"error": "No display available on server"}, status=400)
 
-    root = tk.Tk()
-    root.withdraw()  # Hide the main tkinter window
-    root.attributes('-topmost', True)  # Bring the dialog to the front
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+        
+        root = tk.Tk()
+        root.withdraw()  # Hide the main tkinter window
+        root.attributes('-topmost', True)  # Bring the dialog to the front
+        
+        folder_selected = filedialog.askdirectory()
+        root.destroy()
+        
+        if folder_selected:
+            # Normalize path for Windows
+            folder_selected = os.path.normpath(folder_selected)
+            return JsonResponse({"path": folder_selected})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
     
-    folder_selected = filedialog.askdirectory()
-    root.destroy()
-    
-    if folder_selected:
-        # Normalize path for Windows
-        folder_selected = os.path.normpath(folder_selected)
-        return JsonResponse({"path": folder_selected})
     return JsonResponse({"path": ""})

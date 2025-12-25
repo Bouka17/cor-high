@@ -1,6 +1,6 @@
 import numpy as np
 import librosa
-from moviepy import VideoFileClip
+from moviepy.editor import VideoFileClip
 import os
 
 class AudioAnalyzer:
@@ -20,8 +20,9 @@ class AudioAnalyzer:
         """
         print(f"DEBUG Audio: Chargement du fichier (cela peut être long)...")
         try:
-            # On charge en mono pour l'analyse d'énergie
-            y, sr = librosa.load(self.video_path, sr=22050, mono=True)
+            # On charge en mono avec un sr réduit (11025 au lieu de 22050)
+            # C'est largement suffisant pour détecter les pics d'ambiance
+            y, sr = librosa.load(self.video_path, sr=11025, mono=True)
         except Exception as e:
             print(f"DEBUG Audio Error: {e}")
             raise e
