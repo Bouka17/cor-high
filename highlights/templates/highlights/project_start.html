@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Start Processing - CortexM Highlights{% endblock %}
+
+{% block content %}
+  <div class="card">
+    <h1>{{ project.title }}</h1>
+    <p class="muted">Select the highlight duration and launch processing.</p>
+    <form class="form-grid" method="post">
+      {% csrf_token %}
+      <div>
+        <label for="id_target_duration_minutes">Target duration</label>
+        {{ form.target_duration_minutes }}
+      </div>
+      <button class="button" type="submit">Start processing</button>
+    </form>
+  </div>
+{% endblock %}

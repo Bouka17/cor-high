@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Job Failed - CortexM Highlights{% endblock %}
+
+{% block content %}
+  <div class="card">
+    <h1>Processing failed</h1>
+    <p class="muted">Job {{ job.id }}</p>
+    <p>{{ job.error_message|default:"An unexpected error occurred." }}</p>
+    <a class="button" href="{% url 'project_start' job.project.id %}">Retry</a>
+  </div>
+
+  <div class="card">
+    <h2>Recent events</h2>
+    <ul class="segment-list">
+      {% for event in events %}
+        <li class="segment-item">
+          <div>
+            <strong>{{ event.level|upper }}</strong>
+            <p>{{ event.message }}</p>
+            <p class="muted">{{ event.created_at }}</p>
+          </div>
+        </li>
+      {% empty %}
+        <li class="muted">No events logged.</li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endblock %}

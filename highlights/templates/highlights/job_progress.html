@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}Processing - CortexM Highlights{% endblock %}
+
+{% block content %}
+  <div class="card">
+    <h1>Processing highlights</h1>
+    <p class="muted">Job {{ job.id }}</p>
+    <div class="progress">
+      <div id="progress-bar" class="progress-bar" style="width: {{ job.progress }}%"></div>
+    </div>
+    <p id="progress-text">{{ job.progress }}%</p>
+    <p id="current-step" class="badge">{{ job.current_step|default:"queued" }}</p>
+    <ul id="step-list" class="step-list">
+      <li data-step="ingestion">Ingestion</li>
+      <li data-step="segmentation">Segmentation</li>
+      <li data-step="event_detection">Event detection</li>
+      <li data-step="selection">Selection</li>
+      <li data-step="render">Render</li>
+    </ul>
+
+    <div id="job-status"
+         hx-get="{% url 'job_status' job.id %}"
+         hx-trigger="every 5s"
+         hx-swap="innerHTML">
+      {% include "highlights/_job_status.html" %}
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Selected segments</h2>
+    <ul id="segment-list" class="segment-list">
+      {% for segment in segments %}
+        <li class="segment-item" id="segment-{{ segment.id }}">
+          <div class="segment-thumb">
+            {% if segment.thumbnail %}
+              <img src="{{ segment.thumbnail.url }}" alt="Segment thumbnail">
+            {% else %}
+              <span>No thumbnail</span>
+            {% endif %}
+          </div>
+          <div>
+            <strong>{{ segment.start_time|floatformat:2 }}s -> {{ segment.end_time|floatformat:2 }}s</strong>
+            <p class="muted">Score: {{ segment.score|floatformat:3 }}</p>
+          </div>
+        </li>
+      {% empty %}
+        <li class="muted">No segments selected yet.</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <script>
+    const jobId = "{{ job.id }}";
+    const progressBar = document.getElementById("progress-bar");
+    const progressText = document.getElementById("progress-text");
+    const currentStep = document.getElementById("current-step");
+    const segmentList = document.getElementById("segment-list");
+    const stepItems = Array.from(document.querySelectorAll("#step-list li"));
+    const resultUrl = "{% url 'job_result' job.id %}";
+    const failedUrl = "{% url 'job_failed' job.id %}";
+    const stepOrder = ["ingestion", "segmentation", "event_detection", "selection", "render"];
+
+    const wsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
+    const socket = new WebSocket(`${wsProtocol}://${window.location.host}/ws/jobs/${jobId}/`);
+
+    function formatTime(seconds) {
+      const minutes = Math.floor(seconds / 60);
+      const remainder = Math.floor(seconds % 60);
+      return `${minutes}:${remainder.toString().padStart(2, "0")}`;
+    }
+
+    function renderSegment(segment) {
+      if (document.getElementById(`segment-${segment.id}`)) {
+        return;
+      }
+      const item = document.createElement("li");
+      item.className = "segment-item";
+      item.id = `segment-${segment.id}`;
+
+      const thumb = document.createElement("div");
+      thumb.className = "segment-thumb";
+      if (segment.thumbnail_url) {
+        const img = document.createElement("img");
+        img.src = segment.thumbnail_url;
+        img.alt = "Segment thumbnail";
+        thumb.appendChild(img);
+      } else {
+        const label = document.createElement("span");
+        label.textContent = "No thumbnail";
+        thumb.appendChild(label);
+      }
+
+      const meta = document.createElement("div");
+      const title = document.createElement("strong");
+      title.textContent = `${formatTime(segment.start_time)} -> ${formatTime(segment.end_time)}`;
+      const score = document.createElement("p");
+      score.className = "muted";
+      score.textContent = `Score: ${segment.score.toFixed(3)}`;
+      meta.appendChild(title);
+      meta.appendChild(score);
+
+      item.appendChild(thumb);
+      item.appendChild(meta);
+      segmentList.appendChild(item);
+    }
+
+    function updateStep(step) {
+      stepItems.forEach((item) => {
+        const itemStep = item.dataset.step;
+        item.classList.remove("active", "completed");
+        if (stepOrder.indexOf(itemStep) < stepOrder.indexOf(step)) {
+          item.classList.add("completed");
+        }
+        if (itemStep === step) {
+          item.classList.add("active");
+        }
+      });
+    }
+
+    socket.onmessage = (event) => {
+      const payload = JSON.parse(event.data);
+      if (payload.progress !== undefined) {
+        progressBar.style.width = `${payload.progress}%`;
+        progressText.textContent = `${payload.progress}%`;
+      }
+      if (payload.current_step) {
+        currentStep.textContent = payload.current_step.split("_").join(" ");
+        updateStep(payload.current_step);
+      }
+      if (payload.segments && payload.segments.length) {
+        payload.segments.forEach(renderSegment);
+      }
+      if (payload.status === "succeeded") {
+        window.location.href = resultUrl;
+      }
+      if (payload.status === "failed") {
+        window.location.href = failedUrl;
+      }
+    };
+
+    socket.onclose = () => {
+      currentStep.textContent = "connection closed";
+    };
+
+    updateStep("{{ job.current_step|default:'' }}");
+  </script>
+{% endblock %}

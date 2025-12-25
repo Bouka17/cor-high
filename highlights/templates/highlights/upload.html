@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+
+{% block title %}Upload - CortexM Highlights{% endblock %}
+
+{% block content %}
+  <div class="card">
+    <h1>Upload match video</h1>
+    <p class="muted">Supported: MP4, MOV. A new project is created for each upload.</p>
+    <form id="upload-form" class="form-grid" method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <div>
+        <label for="id_title">Project title</label>
+        {{ form.title }}
+      </div>
+      <div>
+        <label for="id_file">Video file</label>
+        {{ form.file }}
+        <p id="file-info" class="muted"></p>
+      </div>
+      <button id="upload-submit" class="button" type="submit" disabled>Create project</button>
+    </form>
+    {% if form.errors %}
+      <div class="error-banner">
+        {{ form.errors }}
+      </div>
+    {% endif %}
+    {% if upload_error %}
+      <div class="error-banner">{{ upload_error }}</div>
+    {% endif %}
+  </div>
+
+  <div id="upload-progress" class="card hidden">
+    <h2>Uploading</h2>
+    <div class="progress">
+      <div id="upload-progress-bar" class="progress-bar"></div>
+    </div>
+    <p id="upload-progress-text" class="muted">0%</p>
+    <p class="muted">Large files can take time. Keep this tab open.</p>
+  </div>
+
+  <div id="error-modal" class="modal hidden">
+    <div class="modal-card">
+      <h2>Upload error</h2>
+      <p id="error-message" class="muted"></p>
+      <pre id="error-details" class="error-details hidden"></pre>
+      <button id="error-close" class="button" type="button">Close</button>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById("upload-form");
+    const progressCard = document.getElementById("upload-progress");
+    const progressBar = document.getElementById("upload-progress-bar");
+    const progressText = document.getElementById("upload-progress-text");
+    const submitButton = document.getElementById("upload-submit");
+    const errorModal = document.getElementById("error-modal");
+    const errorMessage = document.getElementById("error-message");
+    const errorDetails = document.getElementById("error-details");
+    const errorClose = document.getElementById("error-close");
+    const titleInput = form.querySelector('input[name="title"]');
+    const fileInput = form.querySelector('input[type="file"]');
+    const fileInfo = document.getElementById("file-info");
+    let isUploading = false;
+
+    function formatBytes(bytes) {
+      if (!bytes && bytes !== 0) {
+        return "";
+      }
+      const units = ["B", "KB", "MB", "GB"];
+      let value = bytes;
+      let unitIndex = 0;
+      while (value >= 1024 && unitIndex < units.length - 1) {
+        value /= 1024;
+        unitIndex += 1;
+      }
+      return `${value.toFixed(1)} ${units[unitIndex]}`;
+    }
+
+    function showError(message, details) {
+      const finalMessage = message || "Upload failed. Check server logs.";
+      errorMessage.textContent = finalMessage;
+      if (details) {
+        errorDetails.textContent = details;
+        errorDetails.classList.remove("hidden");
+      } else {
+        errorDetails.textContent = "";
+        errorDetails.classList.add("hidden");
+      }
+      errorModal.classList.remove("hidden");
+      isUploading = false;
+      submitButton.textContent = "Create project";
+      updateSubmitState();
+      progressCard.classList.add("hidden");
+    }
+
+    function extractErrorMessage(xhr) {
+      if (xhr.status === 0) {
+        return "Connection lost. The server may have crashed.";
+      }
+      try {
+        const payload = JSON.parse(xhr.responseText);
+        if (payload.error) {
+          return payload.error;
+        }
+        if (payload.details) {
+          const lines = [];
+          Object.entries(payload.details).forEach(([field, errors]) => {
+            lines.push(`${field}: ${errors.join(", ")}`);
+          });
+          return lines.join(" | ");
+        }
+      } catch (err) {
+        return `Upload failed (status ${xhr.status}).`;
+      }
+      return `Upload failed (status ${xhr.status}).`;
+    }
+
+    function extractErrorDetails(xhr) {
+      const lines = [];
+      if (xhr.status) {
+        lines.push(`HTTP ${xhr.status}`);
+      }
+      const responseText = xhr.responseText || "";
+      if (responseText) {
+        lines.push(responseText.slice(0, 600));
+      }
+      return lines.join("\n");
+    }
+
+    errorClose.addEventListener("click", () => {
+      errorModal.classList.add("hidden");
+    });
+
+    function updateSubmitState() {
+      const hasTitle = titleInput && titleInput.value.trim().length > 0;
+      const hasFile = fileInput && fileInput.files && fileInput.files.length > 0;
+      submitButton.disabled = isUploading || !hasTitle || !hasFile;
+    }
+
+    titleInput.addEventListener("input", updateSubmitState);
+    fileInput.addEventListener("change", () => {
+      updateSubmitState();
+      if (fileInput.files && fileInput.files.length > 0) {
+        const file = fileInput.files[0];
+        fileInfo.textContent = `Selected: ${file.name} (${formatBytes(file.size)})`;
+      } else {
+        fileInfo.textContent = "";
+      }
+    });
+    updateSubmitState();
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (!titleInput || !titleInput.value.trim()) {
+        showError("Project title is required.");
+        return;
+      }
+      if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+        showError("Select a video file to upload.");
+        return;
+      }
+      isUploading = true;
+      submitButton.disabled = true;
+      submitButton.textContent = "Uploading...";
+      progressCard.classList.remove("hidden");
+
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", window.location.href);
+      xhr.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+      const csrfToken = (function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) {
+          return parts.pop().split(";").shift();
+        }
+        return "";
+      })("csrftoken");
+      if (csrfToken) {
+        xhr.setRequestHeader("X-CSRFToken", csrfToken);
+      }
+
+      xhr.upload.onprogress = (eventProgress) => {
+        if (!eventProgress.lengthComputable) {
+          progressText.textContent = "Uploading...";
+          return;
+        }
+        const percent = Math.round(
+          (eventProgress.loaded / eventProgress.total) * 100
+        );
+        progressBar.style.width = `${percent}%`;
+        progressText.textContent = `${percent}% (${formatBytes(eventProgress.loaded)} / ${formatBytes(eventProgress.total)})`;
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const payload = JSON.parse(xhr.responseText);
+            if (payload.redirect_url) {
+              window.location.href = payload.redirect_url;
+              return;
+            }
+          } catch (err) {
+            window.location.reload();
+            return;
+          }
+          window.location.reload();
+          return;
+        }
+        showError(extractErrorMessage(xhr), extractErrorDetails(xhr));
+      };
+
+      xhr.onerror = () => {
+        showError("Network error while uploading.");
+      };
+
+      xhr.onabort = () => {
+        showError("Upload aborted.");
+      };
+
+      xhr.send(new FormData(form));
+    });
+  </script>
+{% endblock %}

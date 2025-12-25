@@ -1,0 +1,3 @@
+echo media/uploads/>> .gitignore
+echo *.mp4>> .gitignore
+git add .gitignore

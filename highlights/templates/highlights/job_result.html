@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Result - CortexM Highlights{% endblock %}
+
+{% block content %}
+  <div class="card">
+    <h1>Highlight ready</h1>
+    <p class="muted">Job {{ job.id }}</p>
+    {% if job.output_file %}
+      <video class="video-box" controls src="{{ job.output_file.url }}"></video>
+      <div class="columns">
+        <a class="button" href="{{ job.output_file.url }}" download>Download MP4</a>
+        <a class="button" href="{% url 'upload' %}">New project</a>
+      </div>
+    {% else %}
+      <p class="muted">Output file not available yet.</p>
+    {% endif %}
+  </div>
+{% endblock %}
